@@ -766,15 +766,22 @@ abstract class FOGService extends FOGBase
             $username = self::$FOGFTP->username = $nodeUser;
             $password = self::$FOGFTP->password = $nodePass;
             $ip = self::$FOGFTP->host = $StorageNode->ip;
+            // Plain HTTP goes to the node's own HTTP port; the HTTPS retries
+            // below stay on 443 and keep the bare $ip.
+            $httphost = self::hostWithHttpPort(
+                $ip,
+                $StorageNode->httpport ?? 0,
+                'http'
+            );
             $sizeurl = sprintf(
                 '%s://%s/fog/status/getsize.php',
                 'http',
-                $ip
+                $httphost
             );
             $hashurl = sprintf(
                 '%s://%s/fog/status/gethash.php',
                 'http',
-                $ip
+                $httphost
             );
             $nodename = $StorageNode->name;
             // This target node's own ftp port (0 = FOG_FTP_PORT, then 21).

@@ -143,6 +143,7 @@ done
 # with them so the output shape is the installer's own.
 {
     body dots
+    body _webUrlHost
     body _reportNodePostFailure
     body registerStorageNode
     body updateStorageNodeCredentials

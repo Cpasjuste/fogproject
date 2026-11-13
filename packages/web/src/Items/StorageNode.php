@@ -69,7 +69,8 @@ class StorageNode extends FOGController
         'webroot' => 'ngmWebroot',
         'graphcolor' => 'ngmGraphColor',
         'sshport' => 'ngmSshPort',
-        'ftpport' => 'ngmFtpPort'
+        'ftpport' => 'ngmFtpPort',
+        'httpport' => 'ngmHttpPort'
     ];
     /**
      * The required fields.
@@ -228,6 +229,16 @@ class StorageNode extends FOGController
         return self::resolveFtpPort(parent::get('ftpport'));
     }
     /**
+     * This node's host as it belongs in an HTTP URL: "ip", or "ip:port"
+     * when the node serves plain HTTP on a port other than 80.
+     *
+     * @return string
+     */
+    public function httpHost()
+    {
+        return self::hostWithHttpPort($this->get('ip'), $this->get('httpport'));
+    }
+    /**
      * Resolve an SSH port from a node's stored value.
      *
      * Public and static so a caller that holds only a router row (a plain
@@ -315,7 +326,9 @@ class StorageNode extends FOGController
         $test = self::$FOGURLRequests->isAvailable($ip, 1, $this->sshPort());
         $online = array_shift($test);
         if (!$online) {
-            $webPort = 'https' === self::$httpproto ? 443 : 80;
+            $webPort = 'https' === self::$httpproto
+                ? 443
+                : ((int)$this->get('httpport') ?: 80);
             $test = self::$FOGURLRequests->isAvailable($ip, 1, $webPort);
             $online = array_shift($test);
         }
@@ -328,7 +341,7 @@ class StorageNode extends FOGController
      */
     public function loadLocation_url()
     {
-        $this->location_url = sprintf('%s://%s/%s', self::$httpproto, $this->get('ip'), $this->get('webroot'));
+        $this->location_url = sprintf('%s://%s/%s', self::$httpproto, $this->httpHost(), $this->get('webroot'));
         $this->set('location_url', $this->location_url);
     }
     /**
@@ -409,7 +422,7 @@ class StorageNode extends FOGController
         $url = sprintf(
             '%s://%s/fog/status/getfiles.php?path=%s',
             self::$httpproto,
-            $this->get('ip'),
+            $this->httpHost(),
             rtrim($items[$item], DS)
         );
         $response = self::$FOGURLRequests->process(

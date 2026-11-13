@@ -20,6 +20,7 @@
         {data: 'webroot'},
         {data: 'graphcolor', visible: false},
         {data: 'sshport', visible: false},
-        {data: 'ftpport', visible: false}
+        {data: 'ftpport', visible: false},
+        {data: 'httpport', visible: false}
     ]);
 })(jQuery);

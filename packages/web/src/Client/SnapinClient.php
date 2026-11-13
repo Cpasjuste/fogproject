@@ -178,7 +178,7 @@ class SnapinClient extends FOGClient
                         $StorageNode->location_url = sprintf(
                             '%s://%s/%s',
                             self::$httpproto,
-                            $StorageNode->get('ip'),
+                            $StorageNode->httpHost(),
                             $StorageNode->get('webroot')
                         );
                     }

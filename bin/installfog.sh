@@ -186,6 +186,9 @@ usage() {
     echo -e "\t            \t\t\t\t(E.G. http://127.0.0.1/fog,"
     echo -e "\t            \t\t\t\t      http://127.0.0.1/)"
     echo -e "\t            \t\t\t\tDefaults to /fog/"
+    echo -e "\t      --http-port\t\tPort the web server listens on for plain"
+    echo -e "\t                 \t\t\tHTTP. Defaults to 80; HTTPS stays on 443."
+    echo -e "\t                 \t\t\tRemembered in .fogsettings"
     echo -e "\t      --fogprogramdir\t\tSpecify the FOG base directory"
     echo -e "\t               \t\t\t\tdefaults to /opt/fog"
     echo -e "\t               \t\t\t\tremembered in /etc/fog/fog.conf, so it"
@@ -275,7 +278,7 @@ usage() {
 sextraServerNames=()
 
 shortopts="h?odEUHSCKYyXTFf:c:W:D:B:s:e:N:l"
-longopts="help,uninstall,purge-db,purge-images,purge-snapins,purge-ssl,purge-user,purge-all,dry-run,force,mysqldbname:,ssl-path:,oldcopy,no-vhost,no-defaults,no-upgrade,no-htmldoc,force-https,no-force-https,https-redirect,no-https-redirect,public-web-cert,no-public-web-cert,rebuild-ipxe-with-my-ca,no-rebuild-ipxe-with-my-ca,install-mode:,recreate-keys,recreate-CA,recreate-Ca,recreate-cA,recreate-ca,external-ca,ca-cert:,ca-key:,ca-root:,autoaccept,file:,docroot:,webroot:,backuppath:,startrange:,endrange:,no-exportbuild,exitFail,no-tftpbuild,list-packages,fogprogramdir:,secure-boot-key:,secure-boot-cert:,no-secure-boot,hostname:,extra-server-name:,kernel-backup-count:,restore-kernel-backup,channel:,netboot-proto:,boot-delay:,uefi-bootfile:,web-ca-cert:,web-ca-key:,web-ca-root:,secureboot-ca-cert:,internal-domain:,internal-subnet:"
+longopts="help,uninstall,purge-db,purge-images,purge-snapins,purge-ssl,purge-user,purge-all,dry-run,force,mysqldbname:,ssl-path:,oldcopy,no-vhost,no-defaults,no-upgrade,no-htmldoc,force-https,no-force-https,https-redirect,no-https-redirect,public-web-cert,no-public-web-cert,rebuild-ipxe-with-my-ca,no-rebuild-ipxe-with-my-ca,install-mode:,recreate-keys,recreate-CA,recreate-Ca,recreate-cA,recreate-ca,external-ca,ca-cert:,ca-key:,ca-root:,autoaccept,file:,docroot:,webroot:,http-port:,backuppath:,startrange:,endrange:,no-exportbuild,exitFail,no-tftpbuild,list-packages,fogprogramdir:,secure-boot-key:,secure-boot-cert:,no-secure-boot,hostname:,extra-server-name:,kernel-backup-count:,restore-kernel-backup,channel:,netboot-proto:,boot-delay:,uefi-bootfile:,web-ca-cert:,web-ca-key:,web-ca-root:,secureboot-ca-cert:,internal-domain:,internal-subnet:"
 
 optargs=$(getopt -o $shortopts -l $longopts -n "$0" -- "$@")
 [[ $? -ne 0 ]] && usage
@@ -517,6 +520,15 @@ while :; do
             # value, so an empty value still counts.
             sWEB_root_set=1
             [[ -z ${sWEB_root} ]] && sWEB_root="/" || sWEB_root="/${sWEB_root}/"
+            shift 2
+            ;;
+        --http-port)
+            if [[ ! $2 =~ ^[0-9]+$ ]] || [[ $2 -lt 1 || $2 -gt 65535 || $2 -eq 443 ]]; then
+                echo "$1 requires a port from 1 to 65535, other than 443"
+                usage
+                exit 3
+            fi
+            sWEB_http_port="$2"
             shift 2
             ;;
         -N | --mysqldbname)
@@ -1023,6 +1035,8 @@ _applyInstallMode
 [[ -n $sexternalca ]] && externalca=$sexternalca
 [[ -n ${sWEB_docroot} ]] && WEB_docroot=${sWEB_docroot}
 [[ -n ${sWEB_root_set} ]] && WEB_root=${sWEB_root}
+[[ -n ${sWEB_http_port} ]] && WEB_http_port=${sWEB_http_port}
+[[ -z ${WEB_http_port} ]] && WEB_http_port=80
 [[ -n ${sDB_backup_path} ]] && DB_backup_path=${sDB_backup_path}
 [[ -n $sexitFail ]] && exitFail=$sexitFail
 [[ -n ${sBOOT_external_tftp_server} ]] && BOOT_external_tftp_server=${sBOOT_external_tftp_server}
@@ -1647,6 +1661,7 @@ while [[ -z $blGo ]]; do
                     installUtilities
                     updateStorageNodeCredentials
                     recordGitUpdateSettings
+                    recordWebHttpPort
                     applyNewInstallDefaults
                     # Beside recordGitUpdateSettings because it is the same kind
                     # of write -- a record, not a control -- and this is the

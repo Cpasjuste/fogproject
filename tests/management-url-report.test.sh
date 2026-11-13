@@ -61,6 +61,8 @@ hasnt() { grep -qF -- "$2" <<<"$1" && bad "$3 (output unexpectedly contained '$2
 # Read the real function rather than reimplementing it -- a test that restated
 # the format would pass while the installer drifted.
 eval "$(sed -n '/^_managementUrls() {/,/^}/p' "$FUNCS")"
+eval "$(sed -n '/^_webUrlHost() {/,/^}/p' "$FUNCS")"
+declare -F _webUrlHost >/dev/null || { echo "ERROR: could not extract _webUrlHost" >&2; exit 1; }
 declare -F _managementUrls >/dev/null || { echo "ERROR: could not extract _managementUrls" >&2; exit 1; }
 
 # _certServesAddress is extracted for real rather than stubbed: the SAN

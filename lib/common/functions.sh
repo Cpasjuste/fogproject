@@ -1094,7 +1094,7 @@ applySystemHostname() {
 _reportNodePostFailure() {
     local status="${1:-000}" body="$2" what="$3"
     echo "Failed"
-    echo " * ${WEB_url_proto}://${NET_fog_server_ip}${WEB_root}maintenance/create_update_node.php"
+    echo " * ${WEB_url_proto}://$(_webUrlHost "${NET_fog_server_ip}" "${WEB_url_proto}")${WEB_root}maintenance/create_update_node.php"
     case $status in
         000)
             # curl's own placeholder when no HTTP response arrived at all --
@@ -1149,7 +1149,7 @@ registerStorageNode() {
     # over ${DB_password}, which is the real control on the node<->master trust
     # bootstrap. Closing this properly needs the master to hand a node its
     # anchor out of band, which is a design change, not a flag change.
-    storageNodeExists=$(curl -s --noproxy '*' -X POST -d "ip=${NET_fog_server_ip}" -d "fogverified" -kL ${WEB_url_proto}://${NET_fog_server_ip}${WEB_root}maintenance/check_node_exists.php -o -)
+    storageNodeExists=$(curl -s --noproxy '*' -X POST -d "ip=${NET_fog_server_ip}" -d "fogverified" -kL ${WEB_url_proto}://$(_webUrlHost "${NET_fog_server_ip}" "${WEB_url_proto}")${WEB_root}maintenance/check_node_exists.php -o -)
     echo "Done"
     if [[ $storageNodeExists != exists ]]; then
         [[ -z $maxClients ]] && maxClients=10
@@ -1177,7 +1177,7 @@ registerStorageNode() {
         # the VALUES now come from ${PKI_client_cert_dir}, ${NET_interface} and
         # ${WEB_root}. Renaming the field names to match the settings would make
         # the master silently drop them.
-        regbody=$(curl -s --noproxy '*' -k -w '\n%{http_code}' -X POST -d "newNode" -d "name=$(echo -n $nodeRegName|base64)" -d "path=$(echo -n ${STORAGE_image_share_path}|base64)" -d "ftppath=$(echo -n ${STORAGE_image_share_path}|base64)" -d "snapinpath=$(echo -n $snapindir|base64)" -d "sslpath=$(echo -n ${PKI_client_cert_dir}|base64)" -d "ip=$(echo -n ${NET_fog_server_ip}|base64)" -d "maxClients=$(echo -n $maxClients|base64)" -d "user=$(echo -n ${SVC_user}|base64)" --data-urlencode "pass=$(echo -n ${SVC_password}|base64)" -d "interface=$(echo -n ${NET_interface}|base64)" -d "bandwidth=1" -d "webroot=$(echo -n ${WEB_root}|base64)" -d "fogverified" ${WEB_url_proto}://${NET_fog_server_ip}${WEB_root}maintenance/create_update_node.php)
+        regbody=$(curl -s --noproxy '*' -k -w '\n%{http_code}' -X POST -d "newNode" -d "name=$(echo -n $nodeRegName|base64)" -d "path=$(echo -n ${STORAGE_image_share_path}|base64)" -d "ftppath=$(echo -n ${STORAGE_image_share_path}|base64)" -d "snapinpath=$(echo -n $snapindir|base64)" -d "sslpath=$(echo -n ${PKI_client_cert_dir}|base64)" -d "ip=$(echo -n ${NET_fog_server_ip}|base64)" -d "maxClients=$(echo -n $maxClients|base64)" -d "user=$(echo -n ${SVC_user}|base64)" --data-urlencode "pass=$(echo -n ${SVC_password}|base64)" -d "interface=$(echo -n ${NET_interface}|base64)" -d "bandwidth=1" -d "webroot=$(echo -n ${WEB_root}|base64)" -d "httpport=$(echo -n ${WEB_http_port:-80}|base64)" -d "fogverified" ${WEB_url_proto}://$(_webUrlHost "${NET_fog_server_ip}" "${WEB_url_proto}")${WEB_root}maintenance/create_update_node.php)
         regstatus=${regbody##*$'\n'}
         regbody=${regbody%$'\n'*}
         case $regstatus in
@@ -1213,7 +1213,7 @@ updateStorageNodeCredentials() {
     #
     # followed by a proxy's block page. Then it echoed "Done" regardless,
     # because nothing looked at the status or at what came back.
-    credbody=$(curl -s --noproxy '*' -k -w '\n%{http_code}' -X POST -d "nodePass" -d "ip=$(echo -n ${NET_fog_server_ip}|base64)" -d "user=$(echo -n ${SVC_user}|base64)" --data-urlencode "pass=$(echo -n ${SVC_password}|base64)" -d "fogverified" ${WEB_url_proto}://${NET_fog_server_ip}${WEB_root}maintenance/create_update_node.php)
+    credbody=$(curl -s --noproxy '*' -k -w '\n%{http_code}' -X POST -d "nodePass" -d "ip=$(echo -n ${NET_fog_server_ip}|base64)" -d "user=$(echo -n ${SVC_user}|base64)" --data-urlencode "pass=$(echo -n ${SVC_password}|base64)" -d "httpport=$(echo -n ${WEB_http_port:-80}|base64)" -d "fogverified" ${WEB_url_proto}://$(_webUrlHost "${NET_fog_server_ip}" "${WEB_url_proto}")${WEB_root}maintenance/create_update_node.php)
     credstatus=${credbody##*$'\n'}
     credbody=${credbody%$'\n'*}
     case $credstatus in
@@ -1269,6 +1269,26 @@ applyNewInstallDefaults() {
     [[ $trackedRows -ne 0 ]] && return 0
     dots "Setting the new-install retention window for host login records"
     mysql $sqloptionsuser --password="${DB_password}" --execute="UPDATE globalSettings SET settingValue='365' WHERE settingKey='FOG_USERTRACKING_RETENTION_DAYS' AND settingValue='0'" ${DB_name} >>$error_log 2>&1
+    errorStat $?
+}
+# A host as it belongs in a URL of protocol $2: "host:port" when $2 is http
+# and the web server serves plain HTTP somewhere other than 80 (--http-port).
+# HTTPS stays on 443, so an https URL never carries the port.
+_webUrlHost() {
+    local host="$1" proto="$2"
+    if [[ $proto == http && ${WEB_http_port:-80} != 80 ]]; then
+        echo "${host}:${WEB_http_port}"
+    else
+        echo "$host"
+    fi
+}
+# FOG_WEB_HTTP_PORT is the port FOG_WEB_HOST serves plain HTTP on. The boot
+# menus and the client page put it in the URLs they build. A record, like
+# SERVICE_LOG_PATH: the vhost is what actually listens, and it is written
+# from ${WEB_http_port}, so the row is rewritten from the same value.
+recordWebHttpPort() {
+    dots "Recording the web server HTTP port"
+    mysql $sqloptionsuser --password="${DB_password}" --execute="INSERT INTO globalSettings (settingKey, settingDesc, settingValue, settingCategory) VALUES ('FOG_WEB_HTTP_PORT', 'The port the web server at FOG_WEB_HOST serves plain HTTP on. HTTPS always uses 443. Recorded automatically by installfog.sh from --http-port -- editing it here has no effect on the web server. To move it, re-run the installer with --http-port.', \"${WEB_http_port:-80}\", 'Web Server') ON DUPLICATE KEY UPDATE settingValue=\"${WEB_http_port:-80}\", settingDesc=VALUES(settingDesc)" ${DB_name} >>$error_log 2>&1
     errorStat $?
 }
 recordGitUpdateSettings() {
@@ -1421,7 +1441,7 @@ backupDB() {
     if [[ -n $dbhastables ]]; then
         [[ ! -d ${DB_backup_path}/fogDBbackups ]] && mkdir -p ${DB_backup_path}/fogDBbackups >>$error_log 2>&1
         local selfName=$(_servedCertName)
-        url="${WEB_url_proto}://${selfName}${WEB_root}maintenance/backup_db.php"
+        url="${WEB_url_proto}://$(_webUrlHost "$selfName" "${WEB_url_proto}")${WEB_root}maintenance/backup_db.php"
         # %H, not %I: %I is the 12-hour clock with no AM/PM marker, so an
         # update run at 05:57 and one at 17:57 on the same day produced the
         # same filename and the second silently overwrote the first.
@@ -1566,7 +1586,7 @@ checkWebTier() {
     # a query string lands in the web server access log and, on failure, in the
     # installer's tee'd stdout. The deploy itself uses the header channel.
     local selfName=$(_servedCertName)
-    local probeUrl="${WEB_url_proto}://${selfName}${WEB_root}management/index.php?node=schema"
+    local probeUrl="${WEB_url_proto}://$(_webUrlHost "$selfName" "${WEB_url_proto}")${WEB_root}management/index.php?node=schema"
     local probeBody=$(mktemp)
     # We care whether bytes came back at all, not just about the status code,
     # because a pre-output fatal loses exactly that. %{http_code} is captured
@@ -1871,7 +1891,7 @@ updateDB() {
             # nothing in $error_log, and errorStat showed unrelated lines.
             local schemacode schemabody
             schemabody=$(mktemp)
-            schemacode=$(curl -X POST -H "X-Fog-Install-Token: ${installToken}" -d "schemaupdate=1" --noproxy '*' "${selfCacertOpts[@]}" -sSL -w '%{http_code}' -o "$schemabody" ${WEB_url_proto}://${selfName}${WEB_root}management/index.php?node=schema 2>>$error_log)
+            schemacode=$(curl -X POST -H "X-Fog-Install-Token: ${installToken}" -d "schemaupdate=1" --noproxy '*' "${selfCacertOpts[@]}" -sSL -w '%{http_code}' -o "$schemabody" ${WEB_url_proto}://$(_webUrlHost "$selfName" "${WEB_url_proto}")${WEB_root}management/index.php?node=schema 2>>$error_log)
             local schemarc=$?
             { cat "$schemabody"; echo; } >>$error_log 2>&1
             rm -f "$schemabody"
@@ -3043,6 +3063,7 @@ configureDefaultiPXEfile() {
         _resolveNetbootHost || return 1
         nbhost="$netboothost"
     fi
+    nbhost=$(_webUrlHost "$nbhost" "${BOOT_url_proto}")
     # param manufacturer took ${product} for years, so every ipxeTable row
     # recorded the model twice and the vendor never once. iPXE exposes the two
     # as separate SMBIOS settings.
@@ -5022,7 +5043,7 @@ _firewallPortList() {
     # services this install actually stood up. Single source of truth: the
     # firewalld path, the ufw path, the iptables instructions and the
     # "here is what you still need to open" message all read this.
-    echo "80/tcp HTTP (web UI, client check-in, iPXE boot)"
+    echo "${WEB_http_port:-80}/tcp HTTP (web UI, client check-in, iPXE boot)"
     # Unconditional: both web servers emit their :443 vhost in BOTH arms, so
     # 443 is listening on every install whatever httpproto says. Gating this on
     # httpproto told admins to leave closed a port their server was serving on.
@@ -5065,6 +5086,10 @@ _configureFirewalld() {
         esac
         firewall-cmd --permanent --add-service=$svc >>$error_log 2>&1 || failed=1
     done
+    # The http service is 80/tcp only. --http-port moves plain HTTP.
+    if [[ ${WEB_http_port:-80} != 80 ]]; then
+        firewall-cmd --permanent --add-port=${WEB_http_port}/tcp >>$error_log 2>&1 || failed=1
+    fi
     # See _firewallPortList: 443 listens on every install.
     firewall-cmd --permanent --add-service=https >>$error_log 2>&1 || failed=1
     # No named service for these two.
@@ -7092,11 +7117,11 @@ _managementUrls() {
     echo "   This can be done by opening a web browser and going to:"
     echo
     if [[ -n $name && ${WEB_url_primary} == address ]]; then
-        echo "   ${WEB_url_proto}://${ip}${WEB_root}management"
-        echo "   ${WEB_url_proto}://${name}${WEB_root}management"
+        echo "   ${WEB_url_proto}://$(_webUrlHost "$ip" "${WEB_url_proto}")${WEB_root}management"
+        echo "   ${WEB_url_proto}://$(_webUrlHost "$name" "${WEB_url_proto}")${WEB_root}management"
     else
-        [[ -n $name ]] && echo "   ${WEB_url_proto}://${name}${WEB_root}management"
-        echo "   ${WEB_url_proto}://${ip}${WEB_root}management"
+        [[ -n $name ]] && echo "   ${WEB_url_proto}://$(_webUrlHost "$name" "${WEB_url_proto}")${WEB_root}management"
+        echo "   ${WEB_url_proto}://$(_webUrlHost "$ip" "${WEB_url_proto}")${WEB_root}management"
     fi
     # The blank line belongs to the explanation, so it is emitted per branch
     # rather than up front -- an HTTP install with no name has nothing to
@@ -8289,6 +8314,11 @@ writeUpdateFile() {
         # install, but it must survive one. See _managementUrls.
         WEB_server_engine WEB_docroot WEB_root WEB_php_version
         WEB_url_proto WEB_https_redirect WEB_url_primary
+        # The port the web server serves plain HTTP on, set by --http-port. A
+        # genuine preference: the vhost, default.ipxe, this node's row and
+        # FOG_WEB_HTTP_PORT are all rewritten from it on every run, so losing
+        # it would move the server back to 80. HTTPS is not affected: 443.
+        WEB_http_port
 
         # --- BOOT_: the client netboot path -- iPXE, TFTP, FOS kernels
         #
@@ -12358,7 +12388,7 @@ EOF
                     # splices it into the real one before nginx -t sees it.
                     beginManagedVhost
                     echo "server {" > "$etcconf"
-                    echo "    listen 80;" >> "$etcconf"
+                    echo "    listen ${WEB_http_port:-80};" >> "$etcconf"
                     echo "    server_name ${vhostname}${vhostaliases};" >> "$etcconf"
                     # Whether :80 SERVES the site or redirects away from it is
                     # the redirect's decision, not ${WEB_url_proto}'s. 443 listens
@@ -12767,10 +12797,21 @@ EOF
                     # variadic, so a multi-homed server still answers to every
                     # address it has.
                     mv -fv "${etcconf}" "${etcconf}.${timestamp}" >>$workingdir/error_logs/fog_error_${version}.log 2>&1
+                    # Plain HTTP is served on ${WEB_http_port} (--http-port), so
+                    # the distro's main "Listen <port>" line follows it, or
+                    # Apache would still hold 80. Only an unindented
+                    # "Listen <number>" is touched: Debian's 443 line sits
+                    # indented inside <IfModule ssl_module>.
+                    local listenconf
+                    for listenconf in /etc/${WEB_server_engine}/ports.conf /etc/${WEB_server_engine}/conf/httpd.conf "$httpdconf"; do
+                        [[ -f $listenconf ]] && grep -q '^Listen [0-9]\+$' "$listenconf" || continue
+                        sed -i "0,/^Listen [0-9]\+\$/s//Listen ${WEB_http_port:-80}/" "$listenconf" >>$workingdir/error_logs/fog_error_${version}.log 2>&1
+                        break
+                    done
                     # See the nginx branch above -- same scratch-file swap, so
                     # none of the write sites below change.
                     beginManagedVhost
-                    echo "<VirtualHost *:80>" > "$etcconf"
+                    echo "<VirtualHost *:${WEB_http_port:-80}>" > "$etcconf"
                     echo "    <FilesMatch \"\.php\$\">" >> "$etcconf"
                     if [[ ${FOG_os_id} -eq 1 && $OSVersion -lt 7 ]]; then
                         echo "        SetHandler application/x-httpd-php" >> "$etcconf"
@@ -12849,7 +12890,14 @@ EOF
                         # curl -L -- which resends a 302'd POST as a GET with
                         # no body, so the server sees no mac= (GH-1829). A 308
                         # keeps the method and body, as nginx's arm does.
-                        echo "    RewriteRule ^/?(.*)\$ https://%{HTTP_HOST}/\$1 [R=308,L]" >> "$etcconf"
+                        if [[ ${WEB_http_port:-80} != 80 ]]; then
+                            # %{HTTP_HOST} carries ":port" off 80, and HTTPS
+                            # is on 443, so redirect to the bare host.
+                            echo "    RewriteCond %{HTTP_HOST} ^([^:]+)" >> "$etcconf"
+                            echo "    RewriteRule ^/?(.*)\$ https://%1/\$1 [R=308,L]" >> "$etcconf"
+                        else
+                            echo "    RewriteRule ^/?(.*)\$ https://%{HTTP_HOST}/\$1 [R=308,L]" >> "$etcconf"
+                        fi
                         echo "</VirtualHost>" >> "$etcconf"
                         echo "<VirtualHost *:443>" >> "$etcconf"
                         echo "    KeepAlive Off" >> "$etcconf"

@@ -755,8 +755,16 @@ class IpxeBootMenu extends BootMenuBase
         ];
         list(
             $webserver,
-            $curroot
-        ) = self::getSetting(['FOG_WEB_HOST','FOG_WEB_ROOT']);
+            $curroot,
+            $webport
+        ) = self::getSetting(['FOG_WEB_HOST','FOG_WEB_ROOT','FOG_WEB_HTTP_PORT']);
+        /**
+         * $webserver stays the bare host: it is also matched against the
+         * storage nodes below. $webhost is what goes into a URL, with
+         * ":port" when plain HTTP is not served on 80.
+         */
+        $webhost = self::hostWithHttpPort($webserver, $webport);
+        $webportsuffix = $webhost === $webserver ? '' : ':' . (int)$webport;
         /**
          * GH-529: FOG_WEB_ROOT was read and then immediately overwritten with a
          * literal '/fog/', so every boot URL handed to iPXE ignored the setting
@@ -784,7 +792,7 @@ class IpxeBootMenu extends BootMenuBase
          * says.
          */
         $webroot = $bootroot;
-        $this->_web = sprintf('%s://%s%s', self::$httpproto, $webserver, $curroot);
+        $this->_web = sprintf('%s://%s%s', self::$httpproto, $webhost, $curroot);
         /**
          * setmacto is the MAC FOS forces onto whichever interface it manages
          * to reach us on, so it has to be the MAC iPXE actually booted with.
@@ -801,7 +809,7 @@ class IpxeBootMenu extends BootMenuBase
             sprintf('set fog-webroot %s', $bootroot),
             'set boot-url '
             . self::$httpproto
-            . '://${fog-ip}/${fog-webroot}',
+            . '://${fog-ip}' . $webportsuffix . '/${fog-webroot}',
             'set setmacto ${netX/mac}',
         ];
         if (self::$Host->isValid()) {
@@ -961,7 +969,7 @@ class IpxeBootMenu extends BootMenuBase
         $this->_loglevel = "loglevel=$loglevel";
         $this->_KS = new KeySequence($keySequence);
         $this->_booturl = self::$httpproto
-            . "://{$webserver}/fog/service";
+            . "://{$webhost}/fog/service";
         $this->_memdisk = "kernel $memdisk initrd=$memtest";
         // The bare file, not "initrd $memtest": _memtestChoice() boots it
         // with kernel or chain, and memdisk is no longer part of that path.

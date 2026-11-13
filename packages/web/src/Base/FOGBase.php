@@ -4446,6 +4446,33 @@ abstract class FOGBase
         return $secret;
     }
     /**
+     * A host as it belongs in an HTTP URL: with ":port" when the server
+     * listens for plain HTTP somewhere other than 80.
+     *
+     * Only plain HTTP moves. HTTPS stays on 443, so an https URL never
+     * carries the port. 0, empty or out of range means the default (80).
+     *
+     * @param string     $host  The host name or address.
+     * @param int|string $port  The HTTP port (a node's httpport, or the
+     *                          FOG_WEB_HTTP_PORT setting).
+     * @param string     $proto The URL's protocol, when it is not
+     *                          self::$httpproto.
+     *
+     * @return string
+     */
+    public static function hostWithHttpPort($host, $port, $proto = null)
+    {
+        $port = (int)$port;
+        if ('http' !== ($proto ?? self::$httpproto)
+            || $port < 1
+            || $port > 65535
+            || 80 === $port
+        ) {
+            return (string)$host;
+        }
+        return $host . ':' . $port;
+    }
+    /**
      * Perform enmass wake on lan.
      *
      * @param array $macs The macs to send
@@ -4492,7 +4519,7 @@ abstract class FOGBase
             $nodeURLs[] = sprintf(
                 $url,
                 self::$httpproto,
-                $StorageNode->ip
+                self::hostWithHttpPort($StorageNode->ip, $StorageNode->httpport ?? 0)
             );
             unset($StorageNode);
         }

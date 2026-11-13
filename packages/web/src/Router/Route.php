@@ -5156,7 +5156,7 @@ class Route extends FOGBase
                         return sprintf(
                             '%s://%s/%s',
                             self::$httpproto,
-                            $node->get('ip'),
+                            $node->httpHost(),
                             $node->get('webroot')
                         );
                     }
@@ -7554,7 +7554,7 @@ class Route extends FOGBase
                         'location_url' => sprintf(
                             '%s://%s/%s',
                             self::$httpproto,
-                            $class->get('ip'),
+                            $class->httpHost(),
                             $class->get('webroot')
                         )
                     ];

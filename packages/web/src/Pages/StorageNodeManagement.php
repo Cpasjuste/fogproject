@@ -80,6 +80,7 @@ class StorageNodeManagement extends FOGPage
             10;
         $sshPort = filter_input(INPUT_POST, 'sshport');
         $ftpPort = filter_input(INPUT_POST, 'ftpport');
+        $httpPort = filter_input(INPUT_POST, 'httpport');
         $isMaster = isset($_POST['isMaster']) ? ' checked' : '';
         $bandwidth = filter_input(INPUT_POST, 'bandwidth');
         $storagegroupID = (int)filter_input(INPUT_POST, 'storagegroupID');
@@ -214,6 +215,26 @@ class StorageNodeManagement extends FOGPage
                 'number',
                 'ftpport',
                 $ftpPort,
+                false,
+                false,
+                -1,
+                -1,
+                'min="0" max="65535"'
+            ),
+            self::makeLabel(
+                $labelClass,
+                'httpport',
+                _('HTTP Port')
+                . '<br/>('
+                . _('Blank uses 80. HTTPS always uses 443')
+                . ')'
+            ) => self::makeInput(
+                'form-control storagenodehttpport-input',
+                'httpport',
+                '',
+                'number',
+                'httpport',
+                $httpPort,
                 false,
                 false,
                 -1,
@@ -576,6 +597,7 @@ class StorageNodeManagement extends FOGPage
         try {
             $sshPort = self::_postPort('sshport', _('SSH Port'));
             $ftpPort = self::_postPort('ftpport', _('FTP Port'));
+            $httpPort = self::_postPort('httpport', _('HTTP Port'));
             // The posted ssh port (0 = global setting) for both checks.
             $testavail = self::$FOGURLRequests->isAvailable($ip, 30, $sshPort);
             $warning = !array_shift($testavail);
@@ -623,6 +645,7 @@ class StorageNodeManagement extends FOGPage
                 ->set('bandwidth', $bandwidth)
                 ->set('sshport', $sshPort)
                 ->set('ftpport', $ftpPort)
+                ->set('httpport', $httpPort)
                 ->set('graphcolor', $graphcolor);
             if (!$StorageNode->save()) {
                 $serverFault = true;
@@ -739,6 +762,10 @@ class StorageNodeManagement extends FOGPage
         $ftpPort = (
             filter_input(INPUT_POST, 'ftpport') ?:
             $this->obj->get('ftpport')
+        ) ?: '';
+        $httpPort = (
+            filter_input(INPUT_POST, 'httpport') ?:
+            $this->obj->get('httpport')
         ) ?: '';
         $bandwidth = (
             filter_input(INPUT_POST, 'bandwidth') ?:
@@ -929,6 +956,26 @@ class StorageNodeManagement extends FOGPage
                 'number',
                 'ftpport',
                 $ftpPort,
+                false,
+                false,
+                -1,
+                -1,
+                'min="0" max="65535"'
+            ),
+            self::makeLabel(
+                $labelClass,
+                'httpport',
+                _('HTTP Port')
+                . '<br/>('
+                . _('Blank uses 80. HTTPS always uses 443')
+                . ')'
+            ) => self::makeInput(
+                'form-control storagenodehttpport-input',
+                'httpport',
+                '',
+                'number',
+                'httpport',
+                $httpPort,
                 false,
                 false,
                 -1,
@@ -1253,6 +1300,7 @@ class StorageNodeManagement extends FOGPage
         // Read before any connection check: they use the posted ssh port.
         $sshPort = self::_postPort('sshport', _('SSH Port'));
         $ftpPort = self::_postPort('ftpport', _('FTP Port'));
+        $httpPort = self::_postPort('httpport', _('HTTP Port'));
         // Three unrelated things can fail here -- the node can be off the
         // network, its SSH service can refuse the handshake, or the account
         // can be rejected -- and this used to report all three as
@@ -1416,6 +1464,7 @@ class StorageNodeManagement extends FOGPage
             ->set('bandwidth', $bandwidth)
             ->set('sshport', $sshPort)
             ->set('ftpport', $ftpPort)
+            ->set('httpport', $httpPort)
             ->set('graphcolor', $graphcolor);
         if ($this->obj->get('isMaster')) {
             $find = [
@@ -1458,7 +1507,7 @@ class StorageNodeManagement extends FOGPage
                 sprintf(
                     '%s://%s/%s/status/kernelvers.php',
                     self::$httpproto,
-                    $this->obj->get('ip'),
+                    $this->obj->httpHost(),
                     self::webrootPath($this->obj->get('webroot'))
                 ),
                 FILTER_SANITIZE_URL

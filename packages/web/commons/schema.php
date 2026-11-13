@@ -12372,3 +12372,11 @@ $this->schema[] = [
     . "ADD COLUMN `hostAuthFailCount` int(10) unsigned NOT NULL DEFAULT 0, "
     . "ADD COLUMN `hostAuthFailIP` varchar(45) NOT NULL DEFAULT ''",
 ];
+// 461
+$this->schema[] = [
+    // A storage node's plain-HTTP port, for a node whose web server is not on
+    // 80. 0 means 80, which is what every existing node keeps. HTTPS stays on
+    // 443, so this only applies to http:// URLs. The installer records it on
+    // every run from --http-port (WEB_http_port in .fogsettings).
+    'ALTER TABLE `nfsGroupMembers` ADD COLUMN `ngmHttpPort` INT(11) NOT NULL DEFAULT 0',
+];

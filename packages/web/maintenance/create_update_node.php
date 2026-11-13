@@ -100,6 +100,9 @@ function nodeRegistrationName($posted, $ip)
 $ip = $stripped['ip'] ?? '';
 $user = $stripped['user'] ?? '';
 $pass = $stripped['pass'] ?? '';
+// The node's plain-HTTP port (0 = 80). Only an installer that knows about it
+// sends it, so an older one leaves the stored value alone.
+$httpport = isset($stripped['httpport']) ? (int)$stripped['httpport'] : null;
 if (isset($_POST['newNode'])) {
     $name = nodeRegistrationName($stripped['name'] ?? '', $ip);
     $path       = $stripped['path'] ?? '';
@@ -128,6 +131,7 @@ if (isset($_POST['newNode'])) {
         ->set('interface', $interface)
         ->set('bandwidth', $bandwidth)
         ->set('webroot', $webroot)
+        ->set('httpport', (int)$httpport)
         ->set('isEnabled', '1')
         ->save();
 } elseif (isset($_POST['nodePass'])) {
@@ -140,13 +144,17 @@ if (isset($_POST['newNode'])) {
     foreach ($StorageNodes as &$StorageNode) {
         if ($StorageNode->user === trim($user)
             && $StorageNode->pass === trim($pass)
+            && (null === $httpport || (int)$StorageNode->httpport === $httpport)
         ) {
             continue;
         }
-        (new StorageNode($StorageNode->id))
+        $Node = (new StorageNode($StorageNode->id))
             ->set('user', $user)
-            ->set('pass', $pass)
-            ->save();
+            ->set('pass', $pass);
+        if (null !== $httpport) {
+            $Node->set('httpport', $httpport);
+        }
+        $Node->save();
         unset($StorageNode);
     }
 }

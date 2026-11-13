@@ -108,7 +108,7 @@ class DashboardPage extends FOGPage
             if (!($StorageNode->isEnabled && $StorageNode->isGraphEnabled)) {
                 continue;
             }
-            $ip = $StorageNode->ip;
+            $ip = self::hostWithHttpPort($StorageNode->ip, $StorageNode->httpport ?? 0);
             /**
              * GH-529: was a literal '/fog/', so a node served from any other
              * webroot was graphed against a URL that does not exist. Each node
@@ -604,7 +604,7 @@ class DashboardPage extends FOGPage
         $url = sprintf(
             '%s://%s/fog/status/freespace.php?path=%s',
             self::$httpproto,
-            $this->obj->get('ip'),
+            $this->obj->httpHost(),
             base64_encode($this->obj->get('path'))
         );
         if (!$this->obj->get('online')) {
@@ -947,7 +947,7 @@ class DashboardPage extends FOGPage
             $url = preg_replace(
                 '#/+#',
                 '/',
-                $StorageNode->ip
+                self::hostWithHttpPort($StorageNode->ip, $StorageNode->httpport ?? 0)
                 . '/' . self::webrootPath($StorageNode->webroot ?? null)
                 . '/service/getversion.php'
             );

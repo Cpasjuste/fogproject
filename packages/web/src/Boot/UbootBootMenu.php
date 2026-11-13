@@ -169,7 +169,8 @@ class UbootBootMenu extends BootMenuBase
             $kernelRamDisk,
             $kernelArgs,
             $kernelDebug,
-            $keymap
+            $keymap,
+            $webport
         ) = self::getSetting(
             [
                 'FOG_WEB_HOST',
@@ -187,6 +188,7 @@ class UbootBootMenu extends BootMenuBase
                 'FOG_KERNEL_ARGS',
                 'FOG_KERNEL_DEBUG',
                 'FOG_KEYMAP',
+                'FOG_WEB_HTTP_PORT',
             ]
         );
 
@@ -196,7 +198,12 @@ class UbootBootMenu extends BootMenuBase
         // such as '/apps/fog/' has to keep every segment.
         $bootroot = trim((string)$curroot, '/');
         $curroot = '/' . ('' === $bootroot ? '' : $bootroot . '/');
-        $web = sprintf('%s://%s%s', self::$httpproto, $webserver, $curroot);
+        $web = sprintf(
+            '%s://%s%s',
+            self::$httpproto,
+            self::hostWithHttpPort($webserver, $webport),
+            $curroot
+        );
 
         // A host (or its group) can name its own kernel and init. No
         // _fileFitsArch() check as iPXE does: that guard exists because iPXE
