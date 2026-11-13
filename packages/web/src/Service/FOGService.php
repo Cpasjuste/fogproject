@@ -245,9 +245,11 @@ abstract class FOGService extends FOGBase
             // exactly the fix, and which used to require restarting all ten
             // daemons before it took. Now the next pass sees it.
             self::$knownips = self::loadKnownIps();
+            // A storage node address being up is enough, as in 1.5. Waiting
+            // for FOG_WEB_HOST too never ends on a storage node: that is the
+            // main server's address, not one of the node's own.
             if (count(self::$ips)
                 && array_intersect(self::$knownips, self::$ips)
-                && in_array(self::getSetting('FOG_WEB_HOST'), self::$ips)
             ) {
                 break;
             }
@@ -255,7 +257,9 @@ abstract class FOGService extends FOGBase
                 sprintf(
                     '%s: %s',
                     _('Interface not ready, waiting for it to come up'),
-                    self::getSetting('FOG_WEB_HOST')
+                    // The node addresses the loop waits for, not the main
+                    // server's FOG_WEB_HOST, which it no longer waits for.
+                    implode(', ', (array)self::$knownips)
                 )
             );
             sleep(10);
@@ -928,9 +932,12 @@ abstract class FOGService extends FOGBase
                         'POST',
                         ['file' => base64_encode($remotefilename)]
                     );
-                    $rsize = array_shift($rsize);
-                    if (is_int($rsize)) {
-                        $remotesize = $rsize;
+                    $rsize = trim((string)array_shift($rsize));
+                    // getsize.php answers with the size as text. is_int()
+                    // never matched a response body, so this answer was
+                    // never used and every size came from the FTP listing.
+                    if (ctype_digit($rsize)) {
+                        $remotesize = (int)$rsize;
                     } else {
                         // we should re-try HTTPS because we don't know about the storage node setup
                         // and letting curl follow the redirect doesn't work for POST requests
@@ -944,9 +951,9 @@ abstract class FOGService extends FOGBase
                             'POST',
                             ['file' => base64_encode($remotefilename)]
                         );
-                        $rsize = array_shift($rsize);
-                        if (is_int($rsize)) {
-                            $remotesize = $rsize;
+                        $rsize = trim((string)array_shift($rsize));
+                        if (ctype_digit($rsize)) {
+                            $remotesize = (int)$rsize;
                         }
                     }
                 }
